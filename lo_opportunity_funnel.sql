@@ -405,3 +405,25 @@ source_app_app_store_id
 FROM source_app_info 
 GROUP BY 1
 ORDER BY 2 DESC
+
+
+-- no bid reasons
+
+select 
+bid_request__device__platform_specific_id_sha1
+, reason 
+, count(*)
+from no_bids 
+where date_diff('hour', from_iso8601_timestamp(dt), current_date) <= 100
+group by 1,2
+order by 1
+
+
+
+select 
+reason 
+, count(*)
+from no_bids 
+where date_diff('hour', from_iso8601_timestamp(dt), current_date) <= 100
+group by 1
+order by 2 DESC 
