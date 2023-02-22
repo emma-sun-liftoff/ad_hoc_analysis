@@ -430,6 +430,7 @@ order by 2 DESC
 
 
 -- unattributed user at src app X device level
+-- this can be used for calculating % user never bid on
 
 WITH temp AS (SELECT 
 device_id_sha1 AS device_id
