@@ -427,3 +427,101 @@ from no_bids
 where date_diff('hour', from_iso8601_timestamp(dt), current_date) <= 100
 group by 1
 order by 2 DESC 
+
+
+-- unattributed user at src app X device level
+
+WITH temp AS (SELECT 
+device_id_sha1 AS device_id
+, is_uncredited 
+, CASE WHEN try(IF(from_big_endian_64(reverse(substr(from_hex(device_id_sha1), 1, 8))) >= 0,
+  CAST(from_big_endian_64(reverse(substr(from_hex(device_id_sha1), 1, 8))) AS double precision) / power(2, 64), 
+  (CAST(from_big_endian_64(reverse(substr(from_hex(device_id_sha1), 1, 8))) AS double precision) / power(2, 64))+1)) < 0.000125 THEN 'yes' ELSE 'no' END AS in_no_bid_user_sample
+, CASE WHEN try(IF(from_big_endian_64(reverse(substr(from_hex(device_id_sha1), 1, 8))) >= 0,
+  CAST(from_big_endian_64(reverse(substr(from_hex(device_id_sha1), 1, 8))) AS double precision) / power(2, 64), 
+  (CAST(from_big_endian_64(reverse(substr(from_hex(device_id_sha1), 1, 8))) AS double precision) / power(2, 64))+1)) < 0.0002   THEN 'yes' ELSE 'no' END AS in_bid_user_sample
+FROM rtb.raw_installs 
+WHERE  date_diff('hour', from_iso8601_timestamp(dt), current_date) <= 24
+	AND app_id = 1579)
+
+
+, devices AS (SELECT 
+DISTINCT device_id
+FROM temp
+WHERE in_bid_user_sample = 'yes' AND in_no_bid_user_sample = 'yes'
+AND is_uncredited = TRUE
+)
+
+
+, funnel AS (
+SELECT 
+bid_request__device__platform_specific_id_sha1 AS device_id
+, bid_request__app__normalized_app_store_id AS app_store_id
+, count(*) AS total_bids 
+, 0 AS total_no_bids
+, 0 AS impressions 
+, 0 AS installs 
+FROM rtb.user_sampled_bids 
+WHERE bid_request__device__platform_specific_id_sha1 IN (SELECT device_id FROM devices)
+AND date_diff('hour', from_iso8601_timestamp(dt), current_date) <= 24
+GROUP BY 1,2
+
+UNION ALL 
+SELECT 
+bid_request__device__platform_specific_id_sha1 AS device_id
+, bid_request__app__normalized_app_store_id AS app_store_id
+, 0 AS total_bids 
+, count(*) AS total_no_bids
+, 0 AS impressions 
+, 0 AS installs 
+FROM rtb.user_sampled_no_bids 
+WHERE bid_request__device__platform_specific_id_sha1 IN (SELECT device_id FROM devices)
+AND date_diff('hour', from_iso8601_timestamp(dt), current_date) <= 24
+GROUP BY 1,2
+
+UNION ALL 
+SELECT
+bid__bid_request__device__platform_specific_id_sha1 AS device_id
+, bid__bid_request__app__normalized_app_store_id AS app_store_id
+, 0 AS total_bids 
+, 0 AS total_no_bids 
+, count(*) AS impressions
+, 0 AS installs 
+FROM rtb.impressions_with_bids 
+WHERE bid__bid_request__device__platform_specific_id_sha1 IN (SELECT device_id FROM devices)
+AND date_diff('hour', from_iso8601_timestamp(dt), current_date) <= 24
+GROUP BY 1,2
+
+UNION ALL 
+SELECT 
+ad_click__impression__bid__bid_request__device__platform_specific_id_sha1 AS device_id
+, ad_click__impression__bid__bid_request__app__normalized_app_store_id AS app_store_id
+, 0 AS total_bids 
+, 0 AS total_no_bids 
+, 0 AS impressions 
+, count(*) AS installs 
+FROM rtb.installs 
+WHERE ad_click__impression__bid__bid_request__device__platform_specific_id_sha1 IN (SELECT device_id FROM devices)
+AND date_diff('hour', from_iso8601_timestamp(dt), current_date) <= 24
+GROUP BY 1,2
+
+)
+
+
+SELECT
+a.device_id
+, i.app_store_id as source_app_app_store_id
+, sum(total_bids) AS total_bids
+, sum(total_no_bids) AS total_no_bids
+, sum(impressions) AS impressions
+, sum(installs) AS installs
+FROM funnel a
+LEFT JOIN pinpoint.public.app_store_apps i
+    on i.id = a.app_store_id
+WHERE i.app_store_id IN ('com.ludo.king',
+'com.mxtech.videoplayer.ad',
+'com.lenovo.anyshare.gps',
+'com.playit.videoplayer',
+'Vidmate',
+'com.king.candycrushsaga')
+GROUP BY 1,2
