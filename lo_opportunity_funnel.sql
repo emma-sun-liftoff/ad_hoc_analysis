@@ -1,4 +1,10 @@
 
+-- find dest app
+select id
+, app_store_app_id 
+from pinpoint.public.apps 
+where id = xxx
+
 -- total opportunity 
 SELECT 
 app_id
