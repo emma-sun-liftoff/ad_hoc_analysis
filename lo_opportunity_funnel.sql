@@ -42,6 +42,21 @@ GROUP BY 1,2
 
 
 
+-- user stats: total addressable users by using users table f
+SELECT
+try(filter(dest_apps, a -> a."id" = 1552109)[1])."attributed"
+, count(DISTINCT (CASE WHEN bid_requests <= 0 THEN id END)) AS user_wo_bid_requests
+, count(DISTINCT (CASE WHEN bid_requests > 0 THEN id END)) AS user_with_bid_requests
+, count(DISTINCT (CASE WHEN bids > 0 AND bid_requests > 0 THEN id END)) AS user_with_bids
+, count(DISTINCT (CASE WHEN bid_requests > 0 AND bids > 0 AND impressions > 0 THEN id END)) AS user_with_imp
+, count(DISTINCT (CASE WHEN bid_requests > 0 AND bids > 0 AND impressions > 0 AND installs > 0 THEN id END)) AS user_with_installs
+FROM proto2parquet.users
+WHERE dt = (SELECT dt FROM proto2parquet."users$partitions" ORDER BY dt DESC OFFSET 1 LIMIT 1)
+  AND try(filter(dest_apps, a -> a."id" = 1552109)[1])."last_install" BETWEEN to_unixtime(date('2023-02-26')) AND to_unixtime(date('2023-02-27'))
+GROUP BY 1
+
+
+
 -- User Level Funnel
 
 WITH funnel AS (
