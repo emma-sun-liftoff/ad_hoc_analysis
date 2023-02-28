@@ -36,7 +36,7 @@ SELECT
 is_uncredited
 , in_bid_user_sample
 --, in_no_bid_user_sample
-count(DISTINCT device_id) AS user_count
+, count(DISTINCT device_id) AS user_count
 FROM temp
 GROUP BY 1,2
 
