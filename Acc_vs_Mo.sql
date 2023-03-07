@@ -1,3 +1,37 @@
+-- All Auction Stats
+with dedupe as (
+  select *, (lo_bid_price - mo_bid_price) as lo_minus_mo_bid from liftoff_moloco_jaeger_logs_agg
+  --where hr = 1
+)
+select 
+  req_os
+  , req_payout_type
+  , count(*) as total_lo_mo_auctions
+  , sum(lo_bid_price) as lo_bid_price
+  , sum(mo_bid_price) as mo_bid_price
+  , sum(case when lo_bid_price is not null then 1 else 0 end) as lo_bids_count
+  , sum(case when mo_bid_price is not null then 1 else 0 end) as mo_bids_count
+  , sum(case when lo_minus_mo_bid is not null then 1 else 0 end) as both_bids_count
+--  , sum(case when lo_minus_mo_bid >= 0 then 1 else 0 end) as lo_bid_higher
+--  , sum(case when lo_minus_mo_bid < 0 then 1 else 0 end) as lo_bid_lower
+  , sum(case when lo_is_winner and mo_bid_price is not null then lo_bid_price end) as lo_bids_price_when_wins_when_both_bid
+  , sum(case when mo_is_winner and lo_bid_price is not null then mo_bid_price end) as mo_bids_price_when_wins_when_both_bid
+  , sum(case when lo_is_winner and mo_bid_price is not null then 1 else 0 end) as lo_wins_when_both_bid
+  , sum(case when mo_is_winner and lo_bid_price is not null then 1 else 0 end) as mo_wins_when_both_bid
+    
+--  , sum(case when lo_minus_mo_bid >= 0 then (lo_bid_price - mo_bid_price / lo_bid_price) else null end) / sum(case when lo_minus_mo_bid >= 0 then 1 else 0 end) as lo_bid_higher_by_percent_average
+--  , sum(case when lo_minus_mo_bid < 0 then (lo_bid_price - mo_bid_price / mo_bid_price) else null end) / sum(case when lo_minus_mo_bid < 0 then 1 else 0 end) as lo_bid_lower_by_percent_average
+--  , sum(case when lo_minus_mo_bid >= 0 then lo_minus_mo_bid else null end) / sum(case when lo_minus_mo_bid >= 0 then 1 else 0 end) as lo_bid_higher_difference_average
+--  , sum(case when lo_minus_mo_bid < 0 then lo_minus_mo_bid else null end) / sum(case when lo_minus_mo_bid < 0 then 1 else 0 end) as lo_bid_lower_difference_average
+--  , avg(case when lo_minus_mo_bid is not null then lo_minus_mo_bid else null end) as avg_bid_diff
+from dedupe
+where mo_resp_adomain in (array('playrix.com')) OR lo_resp_adomain in (array('playrix.com'))
+ --, array('king.com'))
+group by 1,2
+
+
+
+
 -- targeted devices
 with dev_counts as (
 select winning_bid_bundle, trunc(date_trunc('week', timestamp_at_impression)) as imp_week, dev_id_at_impression
